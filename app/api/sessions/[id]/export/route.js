@@ -1,17 +1,14 @@
-import { auth } from "@clerk/nextjs/server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
 /** GET /api/sessions/:id/export?format=json|csv */
 export async function GET(req, { params }) {
-  const { userId } = await auth();
-  if (!userId) return new Response("Unauthorized", { status: 401 });
   const { id } = await params;
   const { searchParams } = new URL(req.url);
   const format = searchParams.get("format") || "json";
 
-  const sb = await getSupabaseServerClient();
+  const sb = getSupabaseServerClient();
   const { data: session } = await sb.from("sessions").select("*").eq("id", id).single();
   if (!session) return new Response("not found", { status: 404 });
 

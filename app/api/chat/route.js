@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
 import { openRouterStream } from "@/lib/openrouter";
 
 export const runtime = "edge";
@@ -13,12 +12,10 @@ export const maxDuration = 300;
  *   { done: true, usage?: {...}, finish_reason?: "..." }
  *   { error: "..." }
  *
- * The client is expected to call this endpoint once per chat window in parallel.
+ * The client calls this once per chat window in parallel.
+ * Auth gate is handled by middleware.js.
  */
 export async function POST(req) {
-  const { userId } = await auth();
-  if (!userId) return new Response("Unauthorized", { status: 401 });
-
   let body;
   try {
     body = await req.json();
@@ -44,7 +41,7 @@ export async function POST(req) {
     return new Response(
       `data: ${JSON.stringify({ error: text || `Upstream ${upstream.status}` })}\n\n`,
       {
-        status: 200, // we still speak SSE even on errors so the client can render them
+        status: 200,
         headers: sseHeaders(),
       },
     );
@@ -70,7 +67,6 @@ export async function POST(req) {
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
 
-          // OpenRouter (like OpenAI) streams as: data: {...}\n\n ... data: [DONE]
           const lines = buffer.split("\n");
           buffer = lines.pop() ?? "";
 
@@ -89,13 +85,13 @@ export async function POST(req) {
               const choice = json.choices?.[0];
               const deltaText =
                 choice?.delta?.content ??
-                choice?.delta?.reasoning ?? // some models emit reasoning chunks
+                choice?.delta?.reasoning ??
                 "";
               if (deltaText) send({ delta: deltaText });
               if (choice?.finish_reason) finishReason = choice.finish_reason;
               if (json.usage) usage = json.usage;
             } catch {
-              // ignore malformed chunks; the upstream sometimes sends keep-alives
+              // ignore malformed keep-alives
             }
           }
         }

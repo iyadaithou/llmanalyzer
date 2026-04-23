@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Folder,
   FolderPlus,
@@ -10,8 +11,8 @@ import {
   ChevronDown,
   Trash2,
   Pencil,
+  LogOut,
 } from "lucide-react";
-import { UserButton } from "@clerk/nextjs";
 
 export default function Sidebar({
   folders,
@@ -26,8 +27,15 @@ export default function Sidebar({
   onRenameFolder,
   onMoveSession,
 }) {
+  const router = useRouter();
   const [openFolders, setOpenFolders] = useState(() => new Set());
   const [menuFor, setMenuFor] = useState(null);
+
+  const logout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.replace("/login");
+    router.refresh();
+  };
 
   const toggleFolder = (id) => {
     const next = new Set(openFolders);
@@ -47,7 +55,13 @@ export default function Sidebar({
             LLM Analyzer
           </span>
         </div>
-        <UserButton afterSignOutUrl="/" />
+        <button
+          onClick={logout}
+          title="Sign out"
+          className="p-1.5 rounded-md text-[color:var(--color-muted)] hover:text-white hover:bg-[color:var(--color-panel-2)]"
+        >
+          <LogOut size={14} />
+        </button>
       </div>
 
       <div className="p-2 flex gap-2">

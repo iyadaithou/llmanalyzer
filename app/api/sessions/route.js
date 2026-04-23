@@ -1,14 +1,11 @@
-import { auth } from "@clerk/nextjs/server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { CURATED_MODELS } from "@/lib/openrouter";
 
 export const runtime = "nodejs";
 
-/** GET /api/sessions — list all sessions for the signed-in user */
+/** GET /api/sessions — list all sessions */
 export async function GET() {
-  const { userId } = await auth();
-  if (!userId) return new Response("Unauthorized", { status: 401 });
-  const sb = await getSupabaseServerClient();
+  const sb = getSupabaseServerClient();
   const { data, error } = await sb
     .from("sessions")
     .select("id, name, folder_id, multi_turn, created_at, updated_at")
@@ -23,16 +20,13 @@ export async function GET() {
  * Creates a session plus one chat_window per model.
  */
 export async function POST(req) {
-  const { userId } = await auth();
-  if (!userId) return new Response("Unauthorized", { status: 401 });
   const body = await req.json().catch(() => ({}));
 
-  const sb = await getSupabaseServerClient();
+  const sb = getSupabaseServerClient();
 
   const { data: session, error: sErr } = await sb
     .from("sessions")
     .insert({
-      user_id: userId,
       name: body.name || "New session",
       folder_id: body.folder_id ?? null,
       multi_turn: body.multi_turn ?? true,
@@ -55,10 +49,8 @@ export async function POST(req) {
 
   const windowRows = models.map((model, i) => ({
     session_id: session.id,
-    user_id: userId,
     model,
-    label:
-      CURATED_MODELS.find((m) => m.id === model)?.label || model,
+    label: CURATED_MODELS.find((m) => m.id === model)?.label || model,
     position: i,
   }));
 

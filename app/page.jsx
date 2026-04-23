@@ -1,11 +1,6 @@
 import Link from "next/link";
-import { auth } from "@clerk/nextjs/server";
-import { SignInButton, UserButton } from "@clerk/nextjs";
 
-export default async function Landing() {
-  const { userId } = await auth();
-  const signedIn = Boolean(userId);
-
+export default function Landing() {
   return (
     <main className="min-h-screen flex flex-col">
       <header className="flex items-center justify-between px-6 py-4 border-b border-[color:var(--color-border)]">
@@ -13,25 +8,12 @@ export default async function Landing() {
           <div className="w-7 h-7 rounded-md bg-gradient-to-br from-[color:var(--color-accent)] to-[color:var(--color-accent-2)]" />
           <span className="font-semibold tracking-tight">LLM Analyzer</span>
         </div>
-        <div className="flex items-center gap-3">
-          {!signedIn ? (
-            <SignInButton mode="modal">
-              <button className="px-4 py-1.5 text-sm rounded-md border border-[color:var(--color-border)] hover:bg-[color:var(--color-panel)]">
-                Sign in
-              </button>
-            </SignInButton>
-          ) : (
-            <>
-              <Link
-                href="/playground"
-                className="px-4 py-1.5 text-sm rounded-md bg-[color:var(--color-accent)] hover:opacity-90"
-              >
-                Open playground
-              </Link>
-              <UserButton afterSignOutUrl="/" />
-            </>
-          )}
-        </div>
+        <Link
+          href="/playground"
+          className="px-4 py-1.5 text-sm rounded-md bg-[color:var(--color-accent)] hover:opacity-90"
+        >
+          Open playground
+        </Link>
       </header>
 
       <section className="flex-1 flex items-center justify-center px-6">
@@ -49,20 +31,12 @@ export default async function Landing() {
           </p>
 
           <div className="mt-8 flex items-center justify-center gap-3">
-            {!signedIn ? (
-              <SignInButton mode="modal">
-                <button className="px-5 py-2.5 rounded-md bg-[color:var(--color-accent)] hover:opacity-90">
-                  Get started
-                </button>
-              </SignInButton>
-            ) : (
-              <Link
-                href="/playground"
-                className="px-5 py-2.5 rounded-md bg-[color:var(--color-accent)] hover:opacity-90"
-              >
-                Open playground
-              </Link>
-            )}
+            <Link
+              href="/playground"
+              className="px-5 py-2.5 rounded-md bg-[color:var(--color-accent)] hover:opacity-90"
+            >
+              Open playground
+            </Link>
             <a
               href="https://openrouter.ai/models"
               target="_blank"
@@ -76,7 +50,7 @@ export default async function Landing() {
       </section>
 
       <footer className="px-6 py-4 text-xs text-[color:var(--color-muted)] border-t border-[color:var(--color-border)]">
-        Powered by OpenRouter, Clerk, Supabase.
+        Powered by OpenRouter + Supabase.
       </footer>
     </main>
   );

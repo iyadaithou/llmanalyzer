@@ -1,15 +1,12 @@
-import { auth } from "@clerk/nextjs/server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { CURATED_MODELS } from "@/lib/openrouter";
 
 export const runtime = "nodejs";
 
 export async function PATCH(req, { params }) {
-  const { userId } = await auth();
-  if (!userId) return new Response("Unauthorized", { status: 401 });
   const { id } = await params;
   const body = await req.json();
-  const sb = await getSupabaseServerClient();
+  const sb = getSupabaseServerClient();
 
   const updates = {};
   if ("model" in body) {
@@ -30,10 +27,8 @@ export async function PATCH(req, { params }) {
 }
 
 export async function DELETE(_req, { params }) {
-  const { userId } = await auth();
-  if (!userId) return new Response("Unauthorized", { status: 401 });
   const { id } = await params;
-  const sb = await getSupabaseServerClient();
+  const sb = getSupabaseServerClient();
   const { error } = await sb.from("chat_windows").delete().eq("id", id);
   if (error) return Response.json({ error: error.message }, { status: 500 });
   return Response.json({ ok: true });

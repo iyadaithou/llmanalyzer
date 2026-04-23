@@ -1,47 +1,38 @@
-import { auth } from "@clerk/nextjs/server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
-/** GET /api/sessions/:id — full session transcript (session + windows + prompts + responses) */
+/** GET /api/sessions/:id — full transcript */
 export async function GET(_req, { params }) {
-  const { userId } = await auth();
-  if (!userId) return new Response("Unauthorized", { status: 401 });
   const { id } = await params;
-  const sb = await getSupabaseServerClient();
+  const sb = getSupabaseServerClient();
 
-  const [sessionRes, windowsRes, promptsRes, responsesRes] = await Promise.all([
+  const [sessionRes, windowsRes, promptsRes] = await Promise.all([
     sb.from("sessions").select("*").eq("id", id).single(),
     sb.from("chat_windows").select("*").eq("session_id", id).order("position"),
     sb.from("prompts").select("*").eq("session_id", id).order("turn_index"),
-    sb
-      .from("responses")
-      .select("*")
-      .in(
-        "prompt_id",
-        (
-          await sb.from("prompts").select("id").eq("session_id", id)
-        ).data?.map((p) => p.id) || ["00000000-0000-0000-0000-000000000000"],
-      ),
   ]);
 
   if (sessionRes.error)
     return Response.json({ error: sessionRes.error.message }, { status: 404 });
 
+  const promptIds = (promptsRes.data || []).map((p) => p.id);
+  const { data: responses } = promptIds.length
+    ? await sb.from("responses").select("*").in("prompt_id", promptIds)
+    : { data: [] };
+
   return Response.json({
     session: sessionRes.data,
     windows: windowsRes.data || [],
     prompts: promptsRes.data || [],
-    responses: responsesRes.data || [],
+    responses: responses || [],
   });
 }
 
 export async function PATCH(req, { params }) {
-  const { userId } = await auth();
-  if (!userId) return new Response("Unauthorized", { status: 401 });
   const { id } = await params;
   const body = await req.json();
-  const sb = await getSupabaseServerClient();
+  const sb = getSupabaseServerClient();
 
   const updates = {};
   for (const k of [
@@ -66,10 +57,8 @@ export async function PATCH(req, { params }) {
 }
 
 export async function DELETE(_req, { params }) {
-  const { userId } = await auth();
-  if (!userId) return new Response("Unauthorized", { status: 401 });
   const { id } = await params;
-  const sb = await getSupabaseServerClient();
+  const sb = getSupabaseServerClient();
   const { error } = await sb.from("sessions").delete().eq("id", id);
   if (error) return Response.json({ error: error.message }, { status: 500 });
   return Response.json({ ok: true });

@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { CURATED_MODELS } from "@/lib/openrouter";
 
@@ -6,13 +5,11 @@ export const runtime = "nodejs";
 
 /** POST /api/sessions/:id/windows  { model } */
 export async function POST(req, { params }) {
-  const { userId } = await auth();
-  if (!userId) return new Response("Unauthorized", { status: 401 });
   const { id } = await params;
   const { model } = await req.json();
   if (!model) return new Response("model required", { status: 400 });
 
-  const sb = await getSupabaseServerClient();
+  const sb = getSupabaseServerClient();
   const { data: existing } = await sb
     .from("chat_windows")
     .select("position")
@@ -25,7 +22,6 @@ export async function POST(req, { params }) {
     .from("chat_windows")
     .insert({
       session_id: id,
-      user_id: userId,
       model,
       label: CURATED_MODELS.find((m) => m.id === model)?.label || model,
       position: nextPos,
