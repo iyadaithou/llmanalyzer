@@ -50,11 +50,16 @@ export default function ChatWindow({
 
   return (
     <div className="flex flex-col min-w-[320px] h-full rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-panel)] overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-[color:var(--color-border)] bg-[color:var(--color-panel-2)]">
+      <div className="flex items-center gap-1.5 px-2 py-2 border-b border-[color:var(--color-border)] bg-[color:var(--color-panel-2)]">
+        {models.find((m) => m.id === w.model)?.kind === "web" && (
+          <span className="badge badge-web shrink-0" title="Web-connected model">
+            Web
+          </span>
+        )}
         <select
           value={w.model}
           onChange={(e) => onChangeModel(e.target.value)}
-          className="bg-transparent text-sm outline-none flex-1 truncate"
+          className="bg-transparent text-sm outline-none flex-1 min-w-0 truncate"
         >
           {groupModels(models).map((group) => (
             <optgroup key={group.label} label={group.label}>
@@ -69,24 +74,23 @@ export default function ChatWindow({
             <option value={w.model}>{w.model}</option>
           )}
         </select>
-        {models.find((m) => m.id === w.model)?.kind === "web" && (
-          <span className="badge badge-web" title="Web-connected model">
-            Web
+        {busy && (
+          <span className="badge badge-streaming animate-pulse shrink-0">
+            streaming
           </span>
         )}
-        {busy && <span className="badge badge-streaming animate-pulse">streaming</span>}
         <button
           onClick={downloadThisChat}
           title="Download this chat as Markdown"
           disabled={turns.length === 0}
-          className="p-1 rounded hover:bg-[color:var(--color-panel)] disabled:opacity-30 disabled:hover:bg-transparent"
+          className="shrink-0 p-1 rounded hover:bg-[color:var(--color-panel)] disabled:opacity-30 disabled:hover:bg-transparent"
         >
           <Download size={14} />
         </button>
         <button
           onClick={onRemove}
           title="Remove window"
-          className="p-1 rounded hover:bg-[color:var(--color-panel)]"
+          className="shrink-0 p-1 rounded hover:bg-[color:var(--color-panel)]"
         >
           <X size={14} />
         </button>
