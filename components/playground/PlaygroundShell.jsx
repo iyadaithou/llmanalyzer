@@ -12,10 +12,13 @@ import {
 import Sidebar from "./Sidebar";
 import ChatWindow from "./ChatWindow";
 
+// Default trio for a new session. Web-connected variants so we're comparing
+// models under conditions closest to what end users actually experience
+// (ChatGPT with search, Claude with web, Perplexity).
 const DEFAULT_MODELS = [
-  "openai/gpt-4o-mini",
-  "anthropic/claude-sonnet-4.5",
-  "google/gemini-2.5-flash",
+  "openai/gpt-4o-search-preview",
+  "anthropic/claude-sonnet-4.5:online",
+  "perplexity/sonar-pro",
 ];
 
 export default function PlaygroundShell() {
@@ -583,6 +586,21 @@ function TopBar({
 
 function AddWindowMenu({ models, onAdd }) {
   const [open, setOpen] = useState(false);
+
+  const groups = useMemo(() => {
+    const buckets = {
+      "Web-connected (live)": [],
+      "Standard": [],
+      "Reasoning": [],
+    };
+    for (const m of models) {
+      if (m.kind === "web") buckets["Web-connected (live)"].push(m);
+      else if (m.kind === "reasoning") buckets["Reasoning"].push(m);
+      else buckets["Standard"].push(m);
+    }
+    return Object.entries(buckets).filter(([, items]) => items.length);
+  }, [models]);
+
   return (
     <div className="relative">
       <button
@@ -597,21 +615,40 @@ function AddWindowMenu({ models, onAdd }) {
             className="fixed inset-0 z-10"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute right-0 top-9 z-20 w-72 max-h-80 overflow-y-auto rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-panel)] shadow-xl py-1">
-            {models.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => {
-                  setOpen(false);
-                  onAdd(m.id);
-                }}
-                className="w-full text-left px-3 py-1.5 text-sm hover:bg-[color:var(--color-panel-2)] flex items-center gap-2"
-              >
-                <span className="flex-1 truncate">{m.label}</span>
-                <span className="text-[11px] text-[color:var(--color-muted)]">
-                  {m.vendor}
-                </span>
-              </button>
+          <div className="absolute right-0 top-9 z-20 w-80 max-h-[60vh] overflow-y-auto rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-panel)] shadow-xl py-1">
+            {groups.map(([label, items]) => (
+              <div key={label}>
+                <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--color-muted)]">
+                  {label}
+                </div>
+                {items.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => {
+                      setOpen(false);
+                      onAdd(m.id);
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-sm hover:bg-[color:var(--color-panel-2)] flex items-center gap-2"
+                  >
+                    <span className="flex-1 min-w-0">
+                      <span className="block truncate">{m.label}</span>
+                      {m.note && (
+                        <span className="block text-[10px] text-[color:var(--color-muted)] truncate">
+                          {m.note}
+                        </span>
+                      )}
+                    </span>
+                    {m.kind === "web" && (
+                      <span className="text-[9px] font-semibold tracking-wide px-1.5 py-0.5 rounded bg-[color:var(--color-accent-2)]/15 text-[color:var(--color-accent-2)]">
+                        WEB
+                      </span>
+                    )}
+                    <span className="text-[10px] text-[color:var(--color-muted)] shrink-0">
+                      {m.vendor}
+                    </span>
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
         </>

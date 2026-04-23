@@ -4,6 +4,24 @@ import { useEffect, useRef, useState } from "react";
 import { X, Star, StickyNote } from "lucide-react";
 import Markdown from "./Markdown";
 
+// Group models for the <select> dropdown: web-connected first, then standard,
+// then reasoning. Keeps the common case (picking a ChatGPT / Claude) near the top.
+function groupModels(models) {
+  const buckets = {
+    "Standard": [],
+    "Web-connected (live)": [],
+    "Reasoning": [],
+  };
+  for (const m of models) {
+    if (m.kind === "web") buckets["Web-connected (live)"].push(m);
+    else if (m.kind === "reasoning") buckets["Reasoning"].push(m);
+    else buckets["Standard"].push(m);
+  }
+  return Object.entries(buckets)
+    .filter(([, items]) => items.length)
+    .map(([label, items]) => ({ label, items }));
+}
+
 export default function ChatWindow({
   w,
   models,
@@ -29,17 +47,29 @@ export default function ChatWindow({
           onChange={(e) => onChangeModel(e.target.value)}
           className="bg-transparent text-sm outline-none flex-1 truncate"
         >
-          {models.map((m) => (
-            <option key={m.id} value={m.id} className="bg-[color:var(--color-panel)]">
-              {m.label} — {m.vendor}
-            </option>
+          {groupModels(models).map((group) => (
+            <optgroup key={group.label} label={group.label}>
+              {group.items.map((m) => (
+                <option key={m.id} value={m.id} className="bg-[color:var(--color-panel)]">
+                  {m.label} — {m.vendor}
+                </option>
+              ))}
+            </optgroup>
           ))}
           {!models.find((m) => m.id === w.model) && (
             <option value={w.model}>{w.model}</option>
           )}
         </select>
+        {models.find((m) => m.id === w.model)?.kind === "web" && (
+          <span
+            title="Web-connected model"
+            className="text-[9px] font-semibold tracking-wide px-1.5 py-0.5 rounded bg-[color:var(--color-accent-2)]/15 text-[color:var(--color-accent-2)]"
+          >
+            WEB
+          </span>
+        )}
         {busy && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--color-accent)]/20 text-[color:var(--color-accent-2)] animate-pulse">
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--color-accent)]/20 text-[color:var(--color-accent)] animate-pulse">
             streaming
           </span>
         )}
