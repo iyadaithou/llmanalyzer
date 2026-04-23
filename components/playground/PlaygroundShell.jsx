@@ -684,18 +684,16 @@ function DownloadMenu({ session, windows, prompts, responses, models }) {
 function AddWindowMenu({ models, onAdd }) {
   const [open, setOpen] = useState(false);
 
+  // Group by vendor so Perplexity's four Sonar variants (and similar)
+  // stay visually adjacent in the picker.
   const groups = useMemo(() => {
-    const buckets = {
-      "Web-connected (live)": [],
-      "Standard": [],
-      "Reasoning": [],
-    };
+    const buckets = new Map();
     for (const m of models) {
-      if (m.kind === "web") buckets["Web-connected (live)"].push(m);
-      else if (m.kind === "reasoning") buckets["Reasoning"].push(m);
-      else buckets["Standard"].push(m);
+      const v = m.vendor || "Other";
+      if (!buckets.has(v)) buckets.set(v, []);
+      buckets.get(v).push(m);
     }
-    return Object.entries(buckets).filter(([, items]) => items.length);
+    return Array.from(buckets);
   }, [models]);
 
   return (
@@ -734,10 +732,6 @@ function AddWindowMenu({ models, onAdd }) {
                           {m.note}
                         </span>
                       )}
-                    </span>
-                    {m.kind === "web" && <span className="badge badge-web">Web</span>}
-                    <span className="text-[10px] text-[color:var(--color-muted)] shrink-0">
-                      {m.vendor}
                     </span>
                   </button>
                 ))}

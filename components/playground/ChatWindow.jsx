@@ -9,22 +9,16 @@ import {
   windowToMarkdown,
 } from "@/lib/markdown-export";
 
-// Group models for the <select> dropdown: web-connected first, then standard,
-// then reasoning. Keeps the common case (picking a ChatGPT / Claude) near the top.
+// Group models by vendor so related variants stay visually adjacent
+// (e.g. all Perplexity Sonar models under one header).
 function groupModels(models) {
-  const buckets = {
-    "Standard": [],
-    "Web-connected (live)": [],
-    "Reasoning": [],
-  };
+  const buckets = new Map();
   for (const m of models) {
-    if (m.kind === "web") buckets["Web-connected (live)"].push(m);
-    else if (m.kind === "reasoning") buckets["Reasoning"].push(m);
-    else buckets["Standard"].push(m);
+    const v = m.vendor || "Other";
+    if (!buckets.has(v)) buckets.set(v, []);
+    buckets.get(v).push(m);
   }
-  return Object.entries(buckets)
-    .filter(([, items]) => items.length)
-    .map(([label, items]) => ({ label, items }));
+  return Array.from(buckets, ([label, items]) => ({ label, items }));
 }
 
 export default function ChatWindow({
