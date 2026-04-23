@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0b0b0f;
+  --color-panel: #121218;
+  --color-panel-2: #16161e;
+  --color-border: #26262f;
+  --color-muted: #8a8a99;
+  --color-text: #ebebf2;
+  --color-accent: #7c5cff;
+  --color-accent-2: #5ad1ff;
+}
+
+html, body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  height: 100%;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+
+/* subtle scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #2a2a36; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #3a3a48; }
+
+.prose-chat p { margin: 0 0 0.65em; }
+.prose-chat pre {
+  background: #0a0a10;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  font-size: 12.5px;
+}
+.prose-chat code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+}
+.prose-chat :not(pre) > code {
+  background: #1b1b24;
+  border: 1px solid var(--color-border);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.prose-chat ul, .prose-chat ol { padding-left: 1.25rem; margin: 0 0 0.5em; }
+.prose-chat h1, .prose-chat h2, .prose-chat h3 { font-weight: 600; margin: 0.6em 0 0.3em; }
+.prose-chat table { border-collapse: collapse; }
+.prose-chat th, .prose-chat td {
+  border: 1px solid var(--color-border);
+  padding: 4px 8px;
+}
