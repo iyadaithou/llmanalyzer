@@ -76,18 +76,11 @@ export default function ChatWindow({
           )}
         </select>
         {models.find((m) => m.id === w.model)?.kind === "web" && (
-          <span
-            title="Web-connected model"
-            className="text-[9px] font-semibold tracking-wide px-1.5 py-0.5 rounded bg-[color:var(--color-accent-2)]/15 text-[color:var(--color-accent-2)]"
-          >
-            WEB
+          <span className="badge badge-web" title="Web-connected model">
+            Web
           </span>
         )}
-        {busy && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--color-accent)]/20 text-[color:var(--color-accent)] animate-pulse">
-            streaming
-          </span>
-        )}
+        {busy && <span className="badge badge-streaming animate-pulse">streaming</span>}
         <button
           onClick={downloadThisChat}
           title="Download this chat as Markdown"

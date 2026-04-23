@@ -502,7 +502,8 @@ function EmptyState({ onNew }) {
         </p>
         <button
           onClick={onNew}
-          className="px-4 py-2 rounded-md bg-[color:var(--color-accent)] hover:opacity-90"
+          className="btn btn-primary"
+          style={{ padding: "9px 16px", fontSize: "13px" }}
         >
           + New session
         </button>
@@ -557,11 +558,7 @@ function TopBar({
       <button
         onClick={onToggleMultiTurn}
         title={session.multi_turn ? "Multi-turn (history kept)" : "One-shot mode"}
-        className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-md border ${
-          session.multi_turn
-            ? "border-[color:var(--color-accent)] text-[color:var(--color-accent)]"
-            : "border-[color:var(--color-border)] text-[color:var(--color-muted)]"
-        }`}
+        className={session.multi_turn ? "btn btn-accent-soft" : "btn btn-secondary"}
       >
         <Repeat size={13} />
         {session.multi_turn ? "Multi-turn" : "One-shot"}
@@ -579,11 +576,7 @@ function TopBar({
 
       <button
         onClick={onOpenSettings}
-        className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-md border ${
-          settingsOpen
-            ? "border-[color:var(--color-accent)]"
-            : "border-[color:var(--color-border)] hover:bg-[color:var(--color-panel)]"
-        }`}
+        className={settingsOpen ? "btn btn-accent-soft" : "btn btn-secondary"}
       >
         <Settings2 size={13} /> Settings
       </button>
@@ -629,7 +622,7 @@ function DownloadMenu({ session, windows, prompts, responses, models }) {
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-md border border-[color:var(--color-border)] hover:bg-[color:var(--color-panel)]"
+        className="btn btn-secondary"
         title="Download"
       >
         <Download size={13} /> Download
@@ -709,7 +702,7 @@ function AddWindowMenu({ models, onAdd }) {
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-md bg-[color:var(--color-panel)] border border-[color:var(--color-border)] hover:bg-[color:var(--color-panel-2)]"
+        className="btn btn-secondary"
       >
         <Plus size={13} /> Add model
       </button>
@@ -742,11 +735,7 @@ function AddWindowMenu({ models, onAdd }) {
                         </span>
                       )}
                     </span>
-                    {m.kind === "web" && (
-                      <span className="text-[9px] font-semibold tracking-wide px-1.5 py-0.5 rounded bg-[color:var(--color-accent-2)]/15 text-[color:var(--color-accent-2)]">
-                        WEB
-                      </span>
-                    )}
+                    {m.kind === "web" && <span className="badge badge-web">Web</span>}
                     <span className="text-[10px] text-[color:var(--color-muted)] shrink-0">
                       {m.vendor}
                     </span>
@@ -833,7 +822,13 @@ function PromptBar({ value, onChange, onSend, onStop, streaming, disabled, multi
         {streaming ? (
           <button
             onClick={onStop}
-            className="flex items-center gap-1 px-3 py-2 rounded-md bg-red-500/20 text-red-300 border border-red-500/40"
+            className="btn"
+            style={{
+              background: "var(--color-danger-soft)",
+              color: "var(--color-danger)",
+              borderColor: "var(--color-danger-soft)",
+              padding: "9px 14px",
+            }}
           >
             <Loader2 className="animate-spin" size={15} /> Stop
           </button>
@@ -841,7 +836,8 @@ function PromptBar({ value, onChange, onSend, onStop, streaming, disabled, multi
           <button
             onClick={onSend}
             disabled={disabled || !value.trim()}
-            className="flex items-center gap-1 px-4 py-2 rounded-md bg-[color:var(--color-accent)] hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="btn btn-primary"
+            style={{ padding: "9px 16px", fontSize: "13px" }}
           >
             <SendHorizonal size={15} /> Send to all
           </button>
