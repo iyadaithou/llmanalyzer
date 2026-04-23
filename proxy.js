@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { COOKIE_NAME, verifyToken } from "@/lib/auth";
 
 /**
- * Password-gate middleware.
+ * Password-gate proxy (formerly middleware).
  * Everything except the public list redirects to /login when the
  * llma_auth cookie is missing or invalid.
  */
@@ -12,11 +12,8 @@ const PUBLIC_PREFIXES = [
   "/api/health",
 ];
 
-export async function middleware(req) {
+export async function proxy(req) {
   const { pathname } = req.nextUrl;
-
-  // Landing page is public too
-  if (pathname === "/") return NextResponse.next();
 
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
@@ -25,7 +22,6 @@ export async function middleware(req) {
   const token = req.cookies.get(COOKIE_NAME)?.value;
   if (await verifyToken(token)) return NextResponse.next();
 
-  // API calls get a 401, page navigations get redirected to /login
   if (pathname.startsWith("/api/")) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
@@ -37,7 +33,6 @@ export async function middleware(req) {
 
 export const config = {
   matcher: [
-    // Run on everything except static assets and Next internals
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     "/(api|trpc)(.*)",
   ],

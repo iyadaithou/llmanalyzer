@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, Star, StickyNote } from "lucide-react";
+import { X, Star, StickyNote, Download } from "lucide-react";
 import Markdown from "./Markdown";
+import {
+  downloadText,
+  safeFilename,
+  windowToMarkdown,
+} from "@/lib/markdown-export";
 
 // Group models for the <select> dropdown: web-connected first, then standard,
 // then reasoning. Keeps the common case (picking a ChatGPT / Claude) near the top.
@@ -24,6 +29,7 @@ function groupModels(models) {
 
 export default function ChatWindow({
   w,
+  session,
   models,
   turns, // [{ prompt, response }]
   onChangeModel,
@@ -38,6 +44,15 @@ export default function ChatWindow({
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [turns]);
+
+  const downloadThisChat = () => {
+    if (!session) return;
+    const md = windowToMarkdown({ session, window: w, turns, models });
+    const modelPart = safeFilename(
+      models.find((m) => m.id === w.model)?.label || w.model,
+    );
+    downloadText(`${safeFilename(session.name)}__${modelPart}.md`, md);
+  };
 
   return (
     <div className="flex flex-col min-w-[320px] h-full rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-panel)] overflow-hidden">
@@ -73,6 +88,14 @@ export default function ChatWindow({
             streaming
           </span>
         )}
+        <button
+          onClick={downloadThisChat}
+          title="Download this chat as Markdown"
+          disabled={turns.length === 0}
+          className="p-1 rounded hover:bg-[color:var(--color-panel)] disabled:opacity-30 disabled:hover:bg-transparent"
+        >
+          <Download size={14} />
+        </button>
         <button
           onClick={onRemove}
           title="Remove window"

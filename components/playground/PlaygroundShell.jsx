@@ -11,6 +11,12 @@ import {
 } from "lucide-react";
 import Sidebar from "./Sidebar";
 import ChatWindow from "./ChatWindow";
+import {
+  downloadText,
+  safeFilename,
+  sessionToMarkdown,
+  windowToMarkdown,
+} from "@/lib/markdown-export";
 
 // Default trio for a new session. Web-connected variants so we're comparing
 // models under conditions closest to what end users actually experience
@@ -420,6 +426,9 @@ export default function PlaygroundShell() {
           <>
             <TopBar
               session={session}
+              windows={windows}
+              prompts={prompts}
+              responses={responses}
               modelCatalog={modelCatalog}
               onAddWindow={addWindow}
               onRename={(name) => updateSessionSetting({ name })}
@@ -451,6 +460,7 @@ export default function PlaygroundShell() {
                   <ChatWindow
                     key={w.id}
                     w={w}
+                    session={session}
                     models={modelCatalog}
                     turns={turnsByWindow.get(w.id) || []}
                     busy={streamingWindows.has(w.id)}
@@ -503,6 +513,9 @@ function EmptyState({ onNew }) {
 
 function TopBar({
   session,
+  windows,
+  prompts,
+  responses,
   modelCatalog,
   onAddWindow,
   onRename,
@@ -546,7 +559,7 @@ function TopBar({
         title={session.multi_turn ? "Multi-turn (history kept)" : "One-shot mode"}
         className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-md border ${
           session.multi_turn
-            ? "border-[color:var(--color-accent)] text-[color:var(--color-accent-2)]"
+            ? "border-[color:var(--color-accent)] text-[color:var(--color-accent)]"
             : "border-[color:var(--color-border)] text-[color:var(--color-muted)]"
         }`}
       >
@@ -556,20 +569,14 @@ function TopBar({
 
       <AddWindowMenu models={modelCatalog} onAdd={onAddWindow} />
 
-      <a
-        href={`/api/sessions/${session.id}/export?format=json`}
-        className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-md border border-[color:var(--color-border)] hover:bg-[color:var(--color-panel)]"
-        title="Export JSON"
-      >
-        <Download size={13} /> JSON
-      </a>
-      <a
-        href={`/api/sessions/${session.id}/export?format=csv`}
-        className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-md border border-[color:var(--color-border)] hover:bg-[color:var(--color-panel)]"
-        title="Export CSV"
-      >
-        <Download size={13} /> CSV
-      </a>
+      <DownloadMenu
+        session={session}
+        windows={windows}
+        prompts={prompts}
+        responses={responses}
+        models={modelCatalog}
+      />
+
       <button
         onClick={onOpenSettings}
         className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-md border ${
@@ -580,6 +587,103 @@ function TopBar({
       >
         <Settings2 size={13} /> Settings
       </button>
+    </div>
+  );
+}
+
+function DownloadMenu({ session, windows, prompts, responses, models }) {
+  const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
+  const hasData = prompts.length > 0 && windows.length > 0;
+
+  const downloadAllMarkdown = () => {
+    close();
+    if (!hasData) return;
+    const md = sessionToMarkdown({ session, windows, prompts, responses, models });
+    downloadText(`${safeFilename(session.name)}.md`, md);
+  };
+
+  const downloadEachSeparate = () => {
+    close();
+    if (!hasData) return;
+    windows.forEach((w, i) => {
+      const turns = prompts.map((p) => ({
+        prompt: p,
+        response: responses.find(
+          (r) => r.prompt_id === p.id && r.chat_window_id === w.id,
+        ),
+      }));
+      const md = windowToMarkdown({ session, window: w, turns, models });
+      const modelPart = safeFilename(
+        models.find((m) => m.id === w.model)?.label || w.model,
+      );
+      // slight stagger so browsers don't collapse simultaneous downloads
+      setTimeout(
+        () => downloadText(`${safeFilename(session.name)}__${modelPart}.md`, md),
+        i * 150,
+      );
+    });
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-md border border-[color:var(--color-border)] hover:bg-[color:var(--color-panel)]"
+        title="Download"
+      >
+        <Download size={13} /> Download
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={close} />
+          <div className="absolute right-0 top-9 z-20 w-64 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-panel)] shadow-xl py-1 text-sm">
+            <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--color-muted)]">
+              All chats in one file
+            </div>
+            <button
+              onClick={downloadAllMarkdown}
+              disabled={!hasData}
+              className="w-full text-left px-3 py-1.5 hover:bg-[color:var(--color-panel-2)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-between"
+            >
+              <span>Markdown (.md)</span>
+              <span className="text-[10px] text-[color:var(--color-muted)]">human-readable</span>
+            </button>
+            <a
+              href={`/api/sessions/${session.id}/export?format=json`}
+              onClick={(e) => (hasData ? close() : e.preventDefault())}
+              className={`px-3 py-1.5 hover:bg-[color:var(--color-panel-2)] flex items-center justify-between ${
+                hasData ? "" : "opacity-40 cursor-not-allowed pointer-events-none"
+              }`}
+            >
+              <span>JSON (.json)</span>
+              <span className="text-[10px] text-[color:var(--color-muted)]">structured</span>
+            </a>
+            <a
+              href={`/api/sessions/${session.id}/export?format=csv`}
+              onClick={(e) => (hasData ? close() : e.preventDefault())}
+              className={`px-3 py-1.5 hover:bg-[color:var(--color-panel-2)] flex items-center justify-between ${
+                hasData ? "" : "opacity-40 cursor-not-allowed pointer-events-none"
+              }`}
+            >
+              <span>CSV (.csv)</span>
+              <span className="text-[10px] text-[color:var(--color-muted)]">for spreadsheets</span>
+            </a>
+            <div className="my-1 border-t border-[color:var(--color-border)]" />
+            <div className="px-3 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--color-muted)]">
+              One file per chat
+            </div>
+            <button
+              onClick={downloadEachSeparate}
+              disabled={!hasData}
+              className="w-full text-left px-3 py-1.5 hover:bg-[color:var(--color-panel-2)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-between"
+            >
+              <span>Markdown × {windows.length}</span>
+              <span className="text-[10px] text-[color:var(--color-muted)]">one per model</span>
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

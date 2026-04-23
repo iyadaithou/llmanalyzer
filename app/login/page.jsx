@@ -14,7 +14,7 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next") || "/playground";
+  const next = params.get("next") || "/";
 
   const [password, setPassword] = useState("");
   const [err, setErr] = useState(null);
