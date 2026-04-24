@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   Folder,
   FolderPlus,
@@ -13,7 +12,6 @@ import {
   PanelLeft,
   Trash2,
   Pencil,
-  LogOut,
   Search,
   X,
   Wallet,
@@ -35,7 +33,6 @@ export default function Sidebar({
   onRenameFolder,
   onMoveSession,
 }) {
-  const router = useRouter();
   const [openFolders, setOpenFolders] = useState(() => new Set());
   const [menuFor, setMenuFor] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
@@ -59,12 +56,6 @@ export default function Sidebar({
       } catch {}
       return next;
     });
-  };
-
-  const logout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
-    router.refresh();
   };
 
   const toggleFolder = (id) => {
@@ -113,15 +104,6 @@ export default function Sidebar({
           <FolderPlus size={15} />
         </button>
 
-        <div className="flex-1" />
-        <button
-          onClick={logout}
-          title="Sign out"
-          className="btn btn-ghost"
-          style={{ padding: "8px" }}
-        >
-          <LogOut size={15} />
-        </button>
       </aside>
     );
   }
@@ -135,24 +117,14 @@ export default function Sidebar({
             LLM Analyzer
           </span>
         </div>
-        <div className="flex items-center gap-0.5 shrink-0">
-          <button
-            onClick={toggleCollapsed}
-            title="Collapse sidebar"
-            className="btn btn-ghost"
-            style={{ padding: "6px" }}
-          >
-            <PanelLeftClose size={14} />
-          </button>
-          <button
-            onClick={logout}
-            title="Sign out"
-            className="btn btn-ghost"
-            style={{ padding: "6px" }}
-          >
-            <LogOut size={14} />
-          </button>
-        </div>
+        <button
+          onClick={toggleCollapsed}
+          title="Collapse sidebar"
+          className="btn btn-ghost shrink-0"
+          style={{ padding: "6px" }}
+        >
+          <PanelLeftClose size={14} />
+        </button>
       </div>
 
       <div className="p-2 flex gap-2">
