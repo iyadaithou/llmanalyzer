@@ -14,6 +14,10 @@ import {
   Trash2,
   Pencil,
   LogOut,
+  Search,
+  X,
+  Wallet,
+  RefreshCw,
 } from "lucide-react";
 
 const LS_KEY = "llma_sidebar_collapsed";
@@ -35,6 +39,7 @@ export default function Sidebar({
   const [openFolders, setOpenFolders] = useState(() => new Set());
   const [menuFor, setMenuFor] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [query, setQuery] = useState("");
 
   // Load persisted collapsed state after mount (avoids SSR mismatch).
   useEffect(() => {
@@ -69,8 +74,14 @@ export default function Sidebar({
     setOpenFolders(next);
   };
 
-  const ungrouped = sessions.filter((s) => !s.folder_id);
-  const byFolder = (fid) => sessions.filter((s) => s.folder_id === fid);
+  const q = query.trim().toLowerCase();
+  const matches = (s) => !q || (s.name || "").toLowerCase().includes(q);
+  const filtered = sessions.filter(matches);
+  const ungrouped = filtered.filter((s) => !s.folder_id);
+  const byFolder = (fid) => filtered.filter((s) => s.folder_id === fid);
+  // When searching, auto-expand folders that contain matches so the user
+  // actually sees the hits instead of collapsed-folder silence.
+  const searching = q.length > 0;
 
   if (collapsed) {
     return (
@@ -162,10 +173,35 @@ export default function Sidebar({
         </button>
       </div>
 
+      <div className="px-2 pb-2">
+        <div className="relative">
+          <Search
+            size={13}
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[color:var(--color-muted)] pointer-events-none"
+          />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search sessions…"
+            className="w-full text-sm bg-[color:var(--color-panel-2)] border border-[color:var(--color-border)] rounded-md pl-7 pr-7 py-1.5 outline-none focus:border-[color:var(--color-accent)]"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery("")}
+              title="Clear search"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-[color:var(--color-muted)] hover:bg-[color:var(--color-panel-hover)]"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      </div>
+
       <nav className="flex-1 overflow-y-auto px-1 pb-3">
         {folders.map((f) => {
-          const open = openFolders.has(f.id);
           const inside = byFolder(f.id);
+          if (searching && inside.length === 0) return null;
+          const open = searching ? true : openFolders.has(f.id);
           return (
             <div key={f.id} className="mt-1">
               <div className="group flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[color:var(--color-panel-2)]">
@@ -231,12 +267,19 @@ export default function Sidebar({
           );
         })}
 
-        <div className="mt-3 px-2 text-[11px] uppercase tracking-wider text-[color:var(--color-muted)]">
-          Ungrouped
-        </div>
-        {ungrouped.length === 0 && (
+        {!searching && (
+          <div className="mt-3 px-2 text-[11px] uppercase tracking-wider text-[color:var(--color-muted)]">
+            Ungrouped
+          </div>
+        )}
+        {ungrouped.length === 0 && !searching && (
           <div className="text-xs text-[color:var(--color-muted)] px-3 py-2">
             No sessions yet. Click <b>New session</b> to start.
+          </div>
+        )}
+        {searching && filtered.length === 0 && (
+          <div className="text-xs text-[color:var(--color-muted)] px-3 py-6 text-center">
+            No sessions match "{query}".
           </div>
         )}
         {ungrouped.map((s) => (
@@ -260,8 +303,115 @@ export default function Sidebar({
           />
         ))}
       </nav>
+
+      <BalanceFooter />
     </aside>
   );
+}
+
+function BalanceFooter() {
+  const [state, setState] = useState({ loading: true });
+
+  const load = async () => {
+    setState((s) => ({ ...s, loading: true, error: null }));
+    try {
+      const r = await fetch("/api/credits", { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "failed");
+      setState({ loading: false, ...j });
+    } catch (e) {
+      setState({ loading: false, error: e.message });
+    }
+  };
+
+  // Load once on mount; refresh every 60s so long research sessions stay
+  // informed without hammering OpenRouter.
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 60_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const fmt = (n) =>
+    typeof n === "number"
+      ? n.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+      : "—";
+
+  const remaining = state.remaining ?? 0;
+  const total = state.total ?? 0;
+  const pct = total > 0 ? Math.min(100, (remaining / total) * 100) : 0;
+  const low = total > 0 && remaining < Math.min(1, total * 0.1);
+  const barColor = low
+    ? "var(--color-danger)"
+    : pct < 30
+      ? "#d97706"
+      : "var(--color-success)";
+
+  return (
+    <div className="border-t border-[color:var(--color-border)] px-3 py-2.5 text-xs">
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <Wallet size={12} className="text-[color:var(--color-muted)]" />
+        <span className="text-[color:var(--color-muted)] flex-1">
+          OpenRouter balance
+        </span>
+        <button
+          onClick={load}
+          title="Refresh balance"
+          disabled={state.loading}
+          className="p-0.5 rounded text-[color:var(--color-muted)] hover:bg-[color:var(--color-panel-2)] disabled:opacity-40"
+        >
+          <RefreshCw
+            size={11}
+            className={state.loading ? "animate-spin" : ""}
+          />
+        </button>
+      </div>
+
+      {state.error ? (
+        <div className="text-[color:var(--color-danger)] text-[11px]">
+          {state.error}
+        </div>
+      ) : (
+        <>
+          <div className="flex items-baseline justify-between">
+            <span className="text-sm font-semibold">${fmt(remaining)}</span>
+            <span className="text-[10.5px] text-[color:var(--color-muted)]">
+              used ${fmt(state.used)} / ${fmt(total)}
+            </span>
+          </div>
+          {total > 0 && (
+            <div className="mt-1.5 h-1 rounded-full bg-[color:var(--color-panel-2)] overflow-hidden">
+              <div
+                className="h-full rounded-full transition-[width]"
+                style={{ width: `${pct}%`, background: barColor }}
+              />
+            </div>
+          )}
+          {low && (
+            <div className="mt-1 text-[10.5px] text-[color:var(--color-danger)]">
+              Low balance — top up at openrouter.ai
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function formatSessionTime(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString([], {
+    month: "numeric",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 function SessionRow({
@@ -276,16 +426,32 @@ function SessionRow({
   onDelete,
   onMove,
 }) {
+  const time = formatSessionTime(s.created_at || s.updated_at);
   return (
     <div
-      className={`group flex items-center gap-1 px-2 py-1.5 mx-1 my-0.5 rounded-md text-sm cursor-pointer transition-colors ${
+      className={`group flex items-start gap-1 px-2 py-1.5 mx-1 my-0.5 rounded-md cursor-pointer transition-colors ${
         active
-          ? "bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent)] font-medium"
+          ? "bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent)]"
           : "hover:bg-[color:var(--color-panel-2)]"
       }`}
       onClick={onSelect}
     >
-      <span className="truncate flex-1">{s.name}</span>
+      <div className="flex-1 min-w-0">
+        <div className={`text-sm truncate ${active ? "font-medium" : ""}`}>
+          {s.name || "Untitled session"}
+        </div>
+        {time && (
+          <div
+            className={`text-[10.5px] mt-0.5 truncate ${
+              active
+                ? "text-[color:var(--color-accent)] opacity-70"
+                : "text-[color:var(--color-muted)]"
+            }`}
+          >
+            {time}
+          </div>
+        )}
+      </div>
       <div
         onClick={(e) => e.stopPropagation()}
         className="opacity-0 group-hover:opacity-100 transition"

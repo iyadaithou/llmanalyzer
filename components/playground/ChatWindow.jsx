@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, Star, StickyNote, Download } from "lucide-react";
+import {
+  X,
+  Star,
+  StickyNote,
+  Download,
+  Globe,
+  ChevronDown,
+  Check,
+} from "lucide-react";
 import Markdown from "./Markdown";
 import {
   downloadText,
@@ -48,32 +56,26 @@ export default function ChatWindow({
     downloadText(`${safeFilename(session.name)}__${modelPart}.md`, md);
   };
 
+  const current = models.find((m) => m.id === w.model);
+
   return (
     <div className="flex flex-col min-w-[320px] h-full rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-panel)] overflow-hidden">
       <div className="flex items-center gap-1.5 px-2 py-2 border-b border-[color:var(--color-border)] bg-[color:var(--color-panel-2)]">
-        {models.find((m) => m.id === w.model)?.kind === "web" && (
-          <span className="badge badge-web shrink-0" title="Web-connected model">
-            Web
+        {current?.kind === "web" && (
+          <span
+            title="Web-connected model"
+            className="shrink-0 flex items-center text-[color:var(--color-success)]"
+          >
+            <Globe size={14} aria-label="Web-connected" />
           </span>
         )}
-        <select
+
+        <ModelPicker
           value={w.model}
-          onChange={(e) => onChangeModel(e.target.value)}
-          className="bg-transparent text-sm outline-none flex-1 min-w-0 truncate"
-        >
-          {groupModels(models).map((group) => (
-            <optgroup key={group.label} label={group.label}>
-              {group.items.map((m) => (
-                <option key={m.id} value={m.id} className="bg-[color:var(--color-panel)]">
-                  {m.label} — {m.vendor}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-          {!models.find((m) => m.id === w.model) && (
-            <option value={w.model}>{w.model}</option>
-          )}
-        </select>
+          models={models}
+          onChange={onChangeModel}
+        />
+
         {busy && (
           <span className="badge badge-streaming animate-pulse shrink-0">
             streaming
@@ -115,6 +117,129 @@ export default function ChatWindow({
           />
         ))}
       </div>
+    </div>
+  );
+}
+
+function ModelPicker({ value, models, onChange }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef(null);
+  const panelRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (
+        btnRef.current?.contains(e.target) ||
+        panelRef.current?.contains(e.target)
+      )
+        return;
+      setOpen(false);
+    };
+    const esc = (e) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+
+  const current = models.find((m) => m.id === value);
+  const currentLabel = current?.label || value;
+  const currentVendor = current?.vendor;
+
+  return (
+    <div className="relative flex-1 min-w-0">
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-1 text-left text-sm px-1.5 py-1 rounded-md hover:bg-[color:var(--color-panel)] transition-colors"
+      >
+        <span className="truncate flex-1 min-w-0">
+          <span className="font-medium">{currentLabel}</span>
+          {currentVendor && (
+            <span className="text-[color:var(--color-muted)]">
+              {" "}
+              · {currentVendor}
+            </span>
+          )}
+        </span>
+        <ChevronDown
+          size={13}
+          className="shrink-0 text-[color:var(--color-muted)]"
+        />
+      </button>
+
+      {open && (
+        <div
+          ref={panelRef}
+          className="absolute left-0 top-full mt-1 z-30 w-[280px] max-h-[60vh] overflow-y-auto rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-panel)] shadow-xl py-1"
+        >
+          {groupModels(models).map((group) => (
+            <div key={group.label}>
+              <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-[color:var(--color-muted)] bg-[color:var(--color-panel-2)]">
+                {group.label}
+              </div>
+              {group.items.map((m) => {
+                const selected = m.id === value;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      onChange(m.id);
+                      setOpen(false);
+                    }}
+                    className={`w-full flex items-start gap-2 px-3 py-1.5 text-sm text-left transition-colors ${
+                      selected
+                        ? "bg-[color:var(--color-accent-soft)]"
+                        : "hover:bg-[color:var(--color-panel-2)]"
+                    }`}
+                  >
+                    {m.kind === "web" ? (
+                      <Globe
+                        size={13}
+                        className="mt-[3px] shrink-0 text-[color:var(--color-success)]"
+                      />
+                    ) : (
+                      <span className="w-[13px] shrink-0" />
+                    )}
+                    <span className="flex-1 min-w-0">
+                      <span
+                        className={`block truncate ${
+                          selected
+                            ? "text-[color:var(--color-accent)] font-medium"
+                            : ""
+                        }`}
+                      >
+                        {m.label}
+                      </span>
+                      {m.note && (
+                        <span className="block text-[11px] text-[color:var(--color-muted)] truncate">
+                          {m.note}
+                        </span>
+                      )}
+                    </span>
+                    {selected && (
+                      <Check
+                        size={13}
+                        className="mt-[3px] shrink-0 text-[color:var(--color-accent)]"
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+          {!current && (
+            <div className="px-3 py-2 text-xs text-[color:var(--color-muted)]">
+              Current: {value}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

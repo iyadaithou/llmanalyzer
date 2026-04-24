@@ -8,6 +8,7 @@ import {
   SendHorizonal,
   Loader2,
   Repeat,
+  Globe,
 } from "lucide-react";
 import Sidebar from "./Sidebar";
 import ChatWindow from "./ChatWindow";
@@ -79,12 +80,26 @@ export default function PlaygroundShell() {
   }, [activeSessionId]);
 
   // ---------- sidebar actions ----------
-  const newSession = useCallback(async () => {
+  const [newSessionOpen, setNewSessionOpen] = useState(false);
+
+  const openNewSessionModal = useCallback(() => setNewSessionOpen(true), []);
+
+  const createSession = useCallback(async (caseName) => {
+    // Empty case name falls back to a short timestamp so the session is still findable.
+    const fallback = new Date().toLocaleString([], {
+      month: "numeric",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    const name = (caseName || "").trim() || `Untitled — ${fallback}`;
+
     const r = await fetch("/api/sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: `Session ${new Date().toLocaleString()}`,
+        name,
         models: DEFAULT_MODELS,
         multi_turn: true,
       }),
@@ -95,6 +110,7 @@ export default function PlaygroundShell() {
       ...prev,
     ]);
     setActiveSessionId(r.session.id);
+    setNewSessionOpen(false);
   }, []);
 
   const newFolder = useCallback(async () => {
@@ -410,7 +426,7 @@ export default function PlaygroundShell() {
         sessions={sessions}
         activeSessionId={activeSessionId}
         onSelectSession={setActiveSessionId}
-        onNewSession={newSession}
+        onNewSession={openNewSessionModal}
         onNewFolder={newFolder}
         onDeleteSession={deleteSession}
         onRenameSession={renameSession}
@@ -421,7 +437,7 @@ export default function PlaygroundShell() {
 
       <main className="flex-1 flex flex-col min-w-0">
         {!session ? (
-          <EmptyState onNew={newSession} />
+          <EmptyState onNew={openNewSessionModal} />
         ) : (
           <>
             <TopBar
@@ -485,11 +501,98 @@ export default function PlaygroundShell() {
           </>
         )}
       </main>
+
+      {newSessionOpen && (
+        <NewSessionModal
+          onClose={() => setNewSessionOpen(false)}
+          onCreate={createSession}
+        />
+      )}
     </div>
   );
 }
 
 // ---------------- sub-UI ----------------
+
+function NewSessionModal({ onClose, onCreate }) {
+  const [name, setName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const submit = async (useName) => {
+    setSubmitting(true);
+    try {
+      await onCreate(useName ? name : "");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div
+        className="absolute inset-0 bg-black/30"
+        onClick={onClose}
+      />
+      <div className="relative w-[min(480px,calc(100vw-32px))] rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-panel)] shadow-2xl p-5">
+        <h2 className="text-lg font-semibold mb-1">New session</h2>
+        <p className="text-xs text-[color:var(--color-muted)] mb-4">
+          Give this session a name that helps you find it later. This is just
+          for your own reference.
+        </p>
+
+        <label className="block text-xs font-medium mb-1.5">
+          Case / session name
+        </label>
+        <input
+          ref={inputRef}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !submitting) submit(true);
+          }}
+          placeholder="What case are you testing?"
+          className="w-full bg-[color:var(--color-panel-2)] border border-[color:var(--color-border)] rounded-md px-3 py-2 text-sm outline-none focus:border-[color:var(--color-accent)]"
+        />
+        <p className="text-[11px] text-[color:var(--color-muted)] mt-1.5">
+          e.g. "recency bias test — news events 2025" or "math word problems round 3"
+        </p>
+
+        <div className="mt-5 flex items-center justify-between gap-2">
+          <button
+            onClick={() => submit(false)}
+            disabled={submitting}
+            className="btn btn-ghost"
+            title="Create with an auto-generated timestamp name"
+          >
+            Skip
+          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} disabled={submitting} className="btn btn-secondary">
+              Cancel
+            </button>
+            <button
+              onClick={() => submit(true)}
+              disabled={submitting || !name.trim()}
+              className="btn btn-primary"
+            >
+              Create session
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function EmptyState({ onNew }) {
   return (
@@ -723,8 +826,16 @@ function AddWindowMenu({ models, onAdd }) {
                       setOpen(false);
                       onAdd(m.id);
                     }}
-                    className="w-full text-left px-3 py-1.5 text-sm hover:bg-[color:var(--color-panel-2)] flex items-center gap-2"
+                    className="w-full text-left px-3 py-1.5 text-sm hover:bg-[color:var(--color-panel-2)] flex items-start gap-2"
                   >
+                    {m.kind === "web" ? (
+                      <Globe
+                        size={13}
+                        className="mt-[3px] shrink-0 text-[color:var(--color-success)]"
+                      />
+                    ) : (
+                      <span className="w-[13px] shrink-0" />
+                    )}
                     <span className="flex-1 min-w-0">
                       <span className="block truncate">{m.label}</span>
                       {m.note && (
