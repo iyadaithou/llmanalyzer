@@ -113,8 +113,12 @@ export default function PlaygroundShell() {
     setNewSessionOpen(false);
   }, []);
 
-  const newFolder = useCallback(async () => {
-    const name = prompt("Folder name");
+  const [newFolderOpen, setNewFolderOpen] = useState(false);
+
+  const openNewFolderModal = useCallback(() => setNewFolderOpen(true), []);
+
+  const createFolder = useCallback(async (folderName) => {
+    const name = (folderName || "").trim();
     if (!name) return;
     const r = await fetch("/api/folders", {
       method: "POST",
@@ -123,6 +127,7 @@ export default function PlaygroundShell() {
     }).then((r) => r.json());
     if (r.error) return alert(r.error);
     setFolders((prev) => [...prev, r.folder]);
+    setNewFolderOpen(false);
   }, []);
 
   const renameSession = async (id, name) => {
@@ -427,7 +432,7 @@ export default function PlaygroundShell() {
         activeSessionId={activeSessionId}
         onSelectSession={setActiveSessionId}
         onNewSession={openNewSessionModal}
-        onNewFolder={newFolder}
+        onNewFolder={openNewFolderModal}
         onDeleteSession={deleteSession}
         onRenameSession={renameSession}
         onDeleteFolder={deleteFolder}
@@ -506,6 +511,12 @@ export default function PlaygroundShell() {
         <NewSessionModal
           onClose={() => setNewSessionOpen(false)}
           onCreate={createSession}
+        />
+      )}
+      {newFolderOpen && (
+        <NewFolderModal
+          onClose={() => setNewFolderOpen(false)}
+          onCreate={createFolder}
         />
       )}
     </div>
@@ -588,6 +599,68 @@ function NewSessionModal({ onClose, onCreate }) {
               Create session
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NewFolderModal({ onClose, onCreate }) {
+  const [name, setName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const submit = async () => {
+    if (!name.trim()) return;
+    setSubmitting(true);
+    try {
+      await onCreate(name);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative w-[min(420px,calc(100vw-32px))] rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-panel)] shadow-2xl p-5">
+        <h2 className="text-lg font-semibold mb-1">New folder</h2>
+        <p className="text-xs text-[color:var(--color-muted)] mb-4">
+          Group related sessions (e.g. by experiment or study).
+        </p>
+        <label className="block text-xs font-medium mb-1.5">
+          Folder name
+        </label>
+        <input
+          ref={inputRef}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !submitting) submit();
+          }}
+          placeholder="e.g. Recency bias study"
+          className="w-full bg-[color:var(--color-panel-2)] border border-[color:var(--color-border)] rounded-md px-3 py-2 text-sm outline-none focus:border-[color:var(--color-accent)]"
+        />
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <button onClick={onClose} disabled={submitting} className="btn btn-secondary">
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={submitting || !name.trim()}
+            className="btn btn-primary"
+          >
+            Create folder
+          </button>
         </div>
       </div>
     </div>
