@@ -34,6 +34,45 @@ const DEFAULT_MODELS = [
 // context for follow-ups without paying to re-ground turn 1 on turn 30.
 const MAX_HISTORY_TURNS = 6;
 
+// Per-vendor concurrency caps for the fan-out. OpenAI is the strictest about
+// concurrent same-model requests on frontier tiers — three gpt-5 windows
+// fired in the same tick reliably trip its burst limiter and return empty
+// streams for the losers. Different vendors run fully in parallel; only
+// requests to the same vendor are queued.
+//
+//   1 = strict serial (safest, slowest for duplicates)
+//   2 = pair-at-a-time
+//   3+ = effectively unlimited for this UI
+//
+// Tune up if you upgrade your OpenAI tier and stop seeing empty completions.
+const VENDOR_CONCURRENCY = {
+  openai: 1,
+  anthropic: 2,
+  google: 2,
+  "x-ai": 2,
+  perplexity: 3,
+  default: 2,
+};
+
+const vendorOf = (modelId) => (modelId || "").split("/")[0] || "default";
+
+// Process `items` with at most `limit` invocations of `fn` in flight. Each
+// worker pulls the next item as soon as its prior one resolves (so a fast
+// finisher doesn't block slower siblings — better than naive batch slicing).
+async function runWithConcurrency(items, limit, fn) {
+  const queue = items.slice();
+  const workers = Array.from(
+    { length: Math.min(Math.max(1, limit), queue.length) },
+    async () => {
+      while (queue.length > 0) {
+        const item = queue.shift();
+        if (item !== undefined) await fn(item);
+      }
+    },
+  );
+  await Promise.all(workers);
+}
+
 export default function PlaygroundShell() {
   // ---------- global state ----------
   const [folders, setFolders] = useState([]);
@@ -307,21 +346,25 @@ export default function PlaygroundShell() {
     windows.forEach((w) => nextStreaming.add(w.id));
     setStreamingWindows(nextStreaming);
 
-    // Stagger requests by ~120ms per window. Firing 3+ identical requests
-    // (e.g. three GPT-5 windows) in the same millisecond can trip OpenAI's
-    // burst-rate-limiter and return empty streams for some of them. A small
-    // stagger smooths this without making the UI feel sequential — once
-    // started, all windows still stream in parallel.
+    // Bucket windows by vendor and fan out with per-vendor concurrency.
+    // Different vendors run fully in parallel; same-vendor requests are
+    // queued up to VENDOR_CONCURRENCY[vendor] in flight at once. This is
+    // what fixes the "3 GPT-5 windows return empty" symptom — OpenAI
+    // throttles concurrent same-model bursts, so we serialize them.
+    const byVendor = new Map();
+    for (const w of windows) {
+      const v = vendorOf(w.model);
+      if (!byVendor.has(v)) byVendor.set(v, []);
+      byVendor.get(v).push(w);
+    }
     await Promise.all(
-      windows.map(
-        (w, i) =>
-          new Promise((resolve) => {
-            setTimeout(
-              () => runWindow(w, prompt, text).then(resolve),
-              i * 120,
-            );
-          }),
-      ),
+      Array.from(byVendor.entries()).map(([vendor, vWindows]) => {
+        const limit =
+          VENDOR_CONCURRENCY[vendor] ?? VENDOR_CONCURRENCY.default;
+        return runWithConcurrency(vWindows, limit, (w) =>
+          runWindow(w, prompt, text),
+        );
+      }),
     );
   }, [input, activeSessionId, windows, streamingWindows, buildMessagesFor]);
 
