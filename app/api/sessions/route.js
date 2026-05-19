@@ -39,7 +39,7 @@ export async function POST(req) {
   if (sErr) return Response.json({ error: sErr.message }, { status: 500 });
 
   const defaultModels = [
-    "openai/gpt-4o-search-preview",
+    "openai/gpt-5:online",
     "anthropic/claude-sonnet-4.5:online",
     "perplexity/sonar-pro",
   ];

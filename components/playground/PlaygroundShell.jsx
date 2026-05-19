@@ -19,11 +19,11 @@ import {
   windowToMarkdown,
 } from "@/lib/markdown-export";
 
-// Default trio for a new session. Web-connected variants so we're comparing
-// models under conditions closest to what end users actually experience
-// (ChatGPT with search, Claude with web, Perplexity).
+// Default trio for a new session. Flagship Exa-augmented OpenAI + Anthropic
+// vs Perplexity's native search — three different search pipelines, three
+// different model families, all on a single tier so the comparison is fair.
 const DEFAULT_MODELS = [
-  "openai/gpt-4o-search-preview",
+  "openai/gpt-5:online",
   "anthropic/claude-sonnet-4.5:online",
   "perplexity/sonar-pro",
 ];
