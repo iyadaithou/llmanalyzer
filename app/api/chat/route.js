@@ -38,8 +38,19 @@ export async function POST(req) {
 
   if (!upstream.ok || !upstream.body) {
     const text = await upstream.text().catch(() => "");
+    // Log to the function logs so Vercel surfaces it. Without this, a 400
+    // from OpenRouter looked like an empty response on the client and we
+    // had no signal what was actually failing — that's how the gpt-5
+    // temperature-rejection bug went undiagnosed for so long.
+    console.error(
+      `[chat] upstream ${upstream.status} for ${model}: ${text.slice(0, 500)}`,
+    );
     return new Response(
-      `data: ${JSON.stringify({ error: text || `Upstream ${upstream.status}` })}\n\n`,
+      `data: ${JSON.stringify({
+        error: text
+          ? `Upstream ${upstream.status}: ${text.slice(0, 300)}`
+          : `Upstream ${upstream.status}`,
+      })}\n\n`,
       {
         status: 200,
         headers: sseHeaders(),
