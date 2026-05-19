@@ -53,6 +53,11 @@ export default function PlaygroundShell() {
   const [streamingWindows, setStreamingWindows] = useState(() => new Set());
   const abortersRef = useRef(new Map()); // windowId -> AbortController
 
+  // Streaming pacing — see flushStreamUpdates below for why.
+  // windowId -> { prompt_id, content } latest pending content for that window.
+  const pendingStreamUpdatesRef = useRef(new Map());
+  const streamFlushHandleRef = useRef(null);
+
   // ---------- boot ----------
   useEffect(() => {
     (async () => {
@@ -307,6 +312,41 @@ export default function PlaygroundShell() {
     );
   }, [input, activeSessionId, windows, streamingWindows, buildMessagesFor]);
 
+  // Flush any pending token updates collected since the last frame. We
+  // accumulate per-window content into a ref and only call setResponses once
+  // per animation frame — without this, a 6-window fan-out at ~50 tokens/sec
+  // each fires ~300 setState/sec, each one mapping over the full responses
+  // array and forcing every ChatWindow + every Markdown to re-render. That's
+  // what caused the freeze when running 3+ models in parallel.
+  const flushStreamUpdates = useCallback(() => {
+    streamFlushHandleRef.current = null;
+    const pending = pendingStreamUpdatesRef.current;
+    if (pending.size === 0) return;
+    const updates = new Map(pending);
+    pending.clear();
+    setResponses((prev) =>
+      prev.map((r) => {
+        const u = updates.get(r.chat_window_id);
+        return u && u.prompt_id === r.prompt_id
+          ? { ...r, content: u.content }
+          : r;
+      }),
+    );
+  }, []);
+
+  const scheduleStreamFlush = useCallback(() => {
+    if (streamFlushHandleRef.current != null) return;
+    streamFlushHandleRef.current = requestAnimationFrame(flushStreamUpdates);
+  }, [flushStreamUpdates]);
+
+  // Cancel any pending rAF on unmount so we don't flush into a dead tree.
+  useEffect(() => () => {
+    if (streamFlushHandleRef.current != null) {
+      cancelAnimationFrame(streamFlushHandleRef.current);
+      streamFlushHandleRef.current = null;
+    }
+  }, []);
+
   const runWindow = useCallback(
     async (w, prompt, text) => {
       const controller = new AbortController();
@@ -349,13 +389,13 @@ export default function PlaygroundShell() {
                 const obj = JSON.parse(line.slice(5).trim());
                 if (obj.delta) {
                   accumulated += obj.delta;
-                  setResponses((prev) =>
-                    prev.map((r) =>
-                      r.prompt_id === prompt.id && r.chat_window_id === w.id
-                        ? { ...r, content: accumulated }
-                        : r,
-                    ),
-                  );
+                  // Buffer the latest accumulated content for this window;
+                  // the rAF flush below will render at most once per frame.
+                  pendingStreamUpdatesRef.current.set(w.id, {
+                    prompt_id: prompt.id,
+                    content: accumulated,
+                  });
+                  scheduleStreamFlush();
                 } else if (obj.done) {
                   finish = obj.finish_reason;
                   usage = obj.usage;
@@ -377,6 +417,15 @@ export default function PlaygroundShell() {
         n.delete(w.id);
         return n;
       });
+
+      // Make sure the final tokens for this window land in state before we
+      // persist — otherwise the rendered content can lag the DB-saved
+      // content by one frame on fast-finishing models.
+      if (streamFlushHandleRef.current != null) {
+        cancelAnimationFrame(streamFlushHandleRef.current);
+        streamFlushHandleRef.current = null;
+      }
+      flushStreamUpdates();
 
       // Persist the finished (or errored) response
       const saved = await fetch("/api/responses", {
@@ -405,7 +454,7 @@ export default function PlaygroundShell() {
         );
       }
     },
-    [session, buildMessagesFor],
+    [session, buildMessagesFor, scheduleStreamFlush, flushStreamUpdates],
   );
 
   const stopAll = () => {
