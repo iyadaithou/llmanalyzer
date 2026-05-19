@@ -276,7 +276,19 @@ function Turn({ t, onRate, onNote }) {
             )
           </div>
         ) : (
-          <Markdown>{t.response?.content || "…"}</Markdown>
+          <>
+            <Markdown>{t.response?.content || "…"}</Markdown>
+            {t.response?.finish_reason === "length" && (
+              // Hit max_tokens. Almost always means the model wanted to keep
+              // going (especially for thinking models that burn budget on
+              // hidden reasoning before visible output). Show a clear hint
+              // instead of leaving the user wondering why it cut.
+              <div className="mt-2 text-[11px] text-amber-500 italic">
+                ⚠ truncated — response hit the max_tokens cap. Bump it in
+                Settings or send a follow-up to continue.
+              </div>
+            )}
+          </>
         )}
         {(t.response?.latency_ms || t.response?.tokens_out) && (
           <div className="mt-2 text-[11px] text-[color:var(--color-muted)] flex gap-3">
