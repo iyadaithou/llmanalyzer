@@ -61,6 +61,29 @@ export async function POST(req) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
       };
 
+      // Process one SSE line; returns true if upstream signaled completion.
+      const processLine = (rawLine) => {
+        const line = rawLine.trim();
+        if (!line.startsWith("data:")) return false;
+        const payload = line.slice(5).trim();
+        if (!payload) return false;
+        if (payload === "[DONE]") return true;
+        try {
+          const json = JSON.parse(payload);
+          const choice = json.choices?.[0];
+          const deltaText =
+            choice?.delta?.content ??
+            choice?.delta?.reasoning ??
+            "";
+          if (deltaText) send({ delta: deltaText });
+          if (choice?.finish_reason) finishReason = choice.finish_reason;
+          if (json.usage) usage = json.usage;
+        } catch {
+          // ignore malformed keep-alives
+        }
+        return false;
+      };
+
       try {
         while (true) {
           const { value, done } = await reader.read();
@@ -71,30 +94,19 @@ export async function POST(req) {
           buffer = lines.pop() ?? "";
 
           for (const rawLine of lines) {
-            const line = rawLine.trim();
-            if (!line.startsWith("data:")) continue;
-            const payload = line.slice(5).trim();
-            if (!payload) continue;
-            if (payload === "[DONE]") {
+            if (processLine(rawLine)) {
               send({ done: true, usage, finish_reason: finishReason });
               controller.close();
               return;
             }
-            try {
-              const json = JSON.parse(payload);
-              const choice = json.choices?.[0];
-              const deltaText =
-                choice?.delta?.content ??
-                choice?.delta?.reasoning ??
-                "";
-              if (deltaText) send({ delta: deltaText });
-              if (choice?.finish_reason) finishReason = choice.finish_reason;
-              if (json.usage) usage = json.usage;
-            } catch {
-              // ignore malformed keep-alives
-            }
           }
         }
+
+        // Flush any final buffered line in case upstream dropped without a
+        // trailing newline (some providers do this on abrupt close — caused
+        // sporadic last-token loss in the past).
+        if (buffer.trim()) processLine(buffer);
+
         send({ done: true, usage, finish_reason: finishReason });
         controller.close();
       } catch (err) {

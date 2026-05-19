@@ -422,7 +422,7 @@ export default function PlaygroundShell() {
             model: w.model,
             messages: buildMessagesFor(w.id, text),
             temperature: Number(session?.temperature ?? 0.7),
-            max_tokens: Number(session?.max_tokens ?? 512),
+            max_tokens: Number(session?.max_tokens ?? 1024),
           }),
           signal: controller.signal,
         });
@@ -1082,9 +1082,9 @@ function SettingsPanel({ session, onChange }) {
         <span className="text-[color:var(--color-muted)]">Max tokens</span>
         <input
           type="number"
-          defaultValue={session.max_tokens ?? 512}
+          defaultValue={session.max_tokens ?? 1024}
           onBlur={(e) =>
-            onChange({ max_tokens: Number(e.target.value) || 512 })
+            onChange({ max_tokens: Number(e.target.value) || 1024 })
           }
           className="bg-[color:var(--color-panel-2)] border border-[color:var(--color-border)] rounded p-1.5 outline-none focus:border-[color:var(--color-accent)]"
         />
