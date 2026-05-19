@@ -264,6 +264,17 @@ function Turn({ t, onRate, onNote }) {
           <div className="text-red-400 text-sm">
             <b>error:</b> {t.response.error}
           </div>
+        ) : t.response?.id && !t.response?.content ? (
+          // Stream finished but nothing was returned. Surface why instead
+          // of just showing "…" — usually finish_reason tells us
+          // (rate-limit, content-filter, length=0 from upstream, etc.).
+          <div className="text-[color:var(--color-muted)] text-sm italic">
+            (model returned no content
+            {t.response?.finish_reason
+              ? ` — finish_reason: ${t.response.finish_reason}`
+              : ""}
+            )
+          </div>
         ) : (
           <Markdown>{t.response?.content || "…"}</Markdown>
         )}

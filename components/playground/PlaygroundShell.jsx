@@ -307,8 +307,21 @@ export default function PlaygroundShell() {
     windows.forEach((w) => nextStreaming.add(w.id));
     setStreamingWindows(nextStreaming);
 
+    // Stagger requests by ~120ms per window. Firing 3+ identical requests
+    // (e.g. three GPT-5 windows) in the same millisecond can trip OpenAI's
+    // burst-rate-limiter and return empty streams for some of them. A small
+    // stagger smooths this without making the UI feel sequential — once
+    // started, all windows still stream in parallel.
     await Promise.all(
-      windows.map((w) => runWindow(w, prompt, text)),
+      windows.map(
+        (w, i) =>
+          new Promise((resolve) => {
+            setTimeout(
+              () => runWindow(w, prompt, text).then(resolve),
+              i * 120,
+            );
+          }),
+      ),
     );
   }, [input, activeSessionId, windows, streamingWindows, buildMessagesFor]);
 
@@ -445,12 +458,23 @@ export default function PlaygroundShell() {
       }).then((r) => r.json());
 
       if (saved.response) {
+        // Merge the saved row into the local response — but never let the
+        // server-sent `content` overwrite a non-empty streamed body. The
+        // streamed text is the source of truth from the moment the user
+        // saw it; the persist round-trip just attaches the `id`, latency,
+        // tokens, cost, etc. Without this guard, an upsert race or a null
+        // content round-trip silently wipes what the user is reading.
         setResponses((prev) =>
-          prev.map((r) =>
-            r.prompt_id === prompt.id && r.chat_window_id === w.id
-              ? { ...saved.response }
-              : r,
-          ),
+          prev.map((r) => {
+            if (
+              r.prompt_id !== prompt.id ||
+              r.chat_window_id !== w.id
+            )
+              return r;
+            const merged = { ...r, ...saved.response };
+            if (!merged.content && r.content) merged.content = r.content;
+            return merged;
+          }),
         );
       }
     },
