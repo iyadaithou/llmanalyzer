@@ -28,6 +28,12 @@ const DEFAULT_MODELS = [
   "perplexity/sonar-pro",
 ];
 
+// Cap how many past turns we replay in multi-turn mode. Without a cap, every
+// new prompt re-sends the entire transcript to every window, which compounds
+// quadratically on token cost over a long research session. 6 keeps recent
+// context for follow-ups without paying to re-ground turn 1 on turn 30.
+const MAX_HISTORY_TURNS = 6;
+
 export default function PlaygroundShell() {
   // ---------- global state ----------
   const [folders, setFolders] = useState([]);
@@ -243,8 +249,10 @@ export default function PlaygroundShell() {
         msgs.push({ role: "system", content: session.system_prompt });
 
       if (session?.multi_turn) {
-        // stitch prior turns: for each past prompt, attach that window's response
-        for (const p of prompts) {
+        // Slide a window over the most recent N turns so input cost stays
+        // bounded; older turns drop off but the system prompt above stays.
+        const recent = prompts.slice(-MAX_HISTORY_TURNS);
+        for (const p of recent) {
           msgs.push({ role: "user", content: p.content });
           const past = responses.find(
             (r) => r.prompt_id === p.id && r.chat_window_id === windowId,
@@ -318,7 +326,7 @@ export default function PlaygroundShell() {
             model: w.model,
             messages: buildMessagesFor(w.id, text),
             temperature: Number(session?.temperature ?? 0.7),
-            max_tokens: Number(session?.max_tokens ?? 1024),
+            max_tokens: Number(session?.max_tokens ?? 512),
           }),
           signal: controller.signal,
         });
@@ -958,9 +966,9 @@ function SettingsPanel({ session, onChange }) {
         <span className="text-[color:var(--color-muted)]">Max tokens</span>
         <input
           type="number"
-          defaultValue={session.max_tokens ?? 1024}
+          defaultValue={session.max_tokens ?? 512}
           onBlur={(e) =>
-            onChange({ max_tokens: Number(e.target.value) || 1024 })
+            onChange({ max_tokens: Number(e.target.value) || 512 })
           }
           className="bg-[color:var(--color-panel-2)] border border-[color:var(--color-border)] rounded p-1.5 outline-none focus:border-[color:var(--color-accent)]"
         />
