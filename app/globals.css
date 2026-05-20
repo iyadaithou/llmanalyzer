@@ -143,3 +143,25 @@ body {
   font-weight: 500;
   letter-spacing: 0.02em;
 }
+
+/* ----- streaming animations ----- */
+/* Bouncing-dots "thinking…" indicator shown while a window is streaming
+   but no tokens have arrived yet. Each dot is staggered by 180ms via
+   inline animationDelay. */
+@keyframes thinking-dot {
+  0%, 70%, 100% { transform: translateY(0); opacity: 0.45; }
+  35%           { transform: translateY(-3px); opacity: 1; }
+}
+.animate-thinking-dot {
+  animation: thinking-dot 1.05s ease-in-out infinite both;
+}
+
+/* Block cursor that pulses at the end of streamed text. Standard chat-UI
+   convention; gives an at-a-glance "still generating" cue. */
+@keyframes stream-cursor {
+  0%, 50%   { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+.animate-stream-cursor {
+  animation: stream-cursor 1s steps(2, end) infinite;
+}

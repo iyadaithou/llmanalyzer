@@ -108,6 +108,9 @@ export default function ChatWindow({
           <Turn
             key={t.prompt?.id || i}
             t={t}
+            // Only the latest turn for this window can be actively streaming
+            // — older turns are already persisted.
+            streaming={busy && i === turns.length - 1}
             onRate={(rating) =>
               t.response?.id && onRateResponse(t.response.id, rating)
             }
@@ -244,10 +247,18 @@ function ModelPicker({ value, models, onChange }) {
   );
 }
 
-function Turn({ t, onRate, onNote }) {
+function Turn({ t, streaming, onRate, onNote }) {
   const [showNotes, setShowNotes] = useState(!!t.response?.notes);
   const [notes, setNotes] = useState(t.response?.notes || "");
   useEffect(() => setNotes(t.response?.notes || ""), [t.response?.id]);
+
+  const hasContent = !!t.response?.content;
+  // Reasoning models (gpt-5, gemini 2.5 pro, sonar-reasoning-pro) plus the
+  // Exa search step on `:online` variants give us 3-7 seconds of dead time
+  // before the first visible token. Show a live indicator during that wait
+  // instead of a static "…" so the user knows it's working, not hung.
+  const showThinking = streaming && !hasContent && !t.response?.error;
+  const showCursor = streaming && hasContent;
 
   return (
     <div className="space-y-2">
@@ -275,9 +286,17 @@ function Turn({ t, onRate, onNote }) {
               : ""}
             )
           </div>
+        ) : showThinking ? (
+          <ThinkingIndicator />
         ) : (
           <>
             <Markdown>{t.response?.content || "…"}</Markdown>
+            {showCursor && (
+              <span
+                aria-hidden
+                className="inline-block w-[8px] h-[14px] -mb-[2px] ml-0.5 bg-[color:var(--color-accent)] align-baseline animate-stream-cursor"
+              />
+            )}
             {t.response?.finish_reason === "length" && (
               // Hit max_tokens. Almost always means the model wanted to keep
               // going (especially for thinking models that burn budget on
@@ -334,6 +353,43 @@ function Turn({ t, onRate, onNote }) {
           />
         )}
       </div>
+    </div>
+  );
+}
+
+function ThinkingIndicator() {
+  // Bumps an elapsed-seconds counter every 500ms so the user sees the wait
+  // is finite and the app isn't hung. Resets implicitly via remount when
+  // the parent flips off `showThinking` (first token arrives).
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const start = Date.now();
+    const id = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - start) / 1000));
+    }, 500);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div className="flex items-center gap-2 text-sm text-[color:var(--color-muted)] italic">
+      <span className="inline-flex gap-1" aria-hidden>
+        <span
+          className="h-1.5 w-1.5 rounded-full bg-current animate-thinking-dot"
+          style={{ animationDelay: "0ms" }}
+        />
+        <span
+          className="h-1.5 w-1.5 rounded-full bg-current animate-thinking-dot"
+          style={{ animationDelay: "180ms" }}
+        />
+        <span
+          className="h-1.5 w-1.5 rounded-full bg-current animate-thinking-dot"
+          style={{ animationDelay: "360ms" }}
+        />
+      </span>
+      <span>
+        thinking
+        {elapsed >= 2 ? ` · ${elapsed}s` : ""}
+      </span>
     </div>
   );
 }
