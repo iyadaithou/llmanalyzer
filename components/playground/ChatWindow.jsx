@@ -279,12 +279,28 @@ function Turn({ t, streaming, onRate, onNote }) {
           // Stream finished but nothing was returned. Surface why instead
           // of just showing "…" — usually finish_reason tells us
           // (rate-limit, content-filter, length=0 from upstream, etc.).
+          // For OpenAI reasoning models specifically, finish_reason="length"
+          // + reasoning_tokens > 0 means the model spent the entire budget
+          // on hidden reasoning before emitting any visible output. Tell the
+          // user that explicitly so they don't think it's a generic cut-off.
           <div className="text-[color:var(--color-muted)] text-sm italic">
-            (model returned no content
-            {t.response?.finish_reason
-              ? ` — finish_reason: ${t.response.finish_reason}`
-              : ""}
-            )
+            {t.response?.finish_reason === "length" &&
+            t.response?.reasoning_tokens > 0 ? (
+              <>
+                (reasoning ate the whole budget — {t.response.reasoning_tokens}{" "}
+                tokens spent thinking, 0 tokens left for the answer. Bump
+                max_tokens in Settings, or this prompt is too hard for the
+                current cap.)
+              </>
+            ) : (
+              <>
+                (model returned no content
+                {t.response?.finish_reason
+                  ? ` — finish_reason: ${t.response.finish_reason}`
+                  : ""}
+                )
+              </>
+            )}
           </div>
         ) : showThinking ? (
           <ThinkingIndicator />

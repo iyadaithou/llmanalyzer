@@ -500,6 +500,12 @@ export default function PlaygroundShell() {
         }),
       }).then((r) => r.json());
 
+      // Pulled out separately because we don't currently persist reasoning
+      // tokens to the DB — kept in-memory only so the UI can warn the user
+      // when GPT-5/o-series burns the entire budget on hidden reasoning.
+      const reasoningTokens =
+        usage?.completion_tokens_details?.reasoning_tokens ?? null;
+
       if (saved.response) {
         // Merge the saved row into the local response — but never let the
         // server-sent `content` overwrite a non-empty streamed body. The
@@ -514,7 +520,7 @@ export default function PlaygroundShell() {
               r.chat_window_id !== w.id
             )
               return r;
-            const merged = { ...r, ...saved.response };
+            const merged = { ...r, ...saved.response, reasoning_tokens: reasoningTokens };
             if (!merged.content && r.content) merged.content = r.content;
             return merged;
           }),
